@@ -1,0 +1,8 @@
+# The package itself (installs pipecat-ai, websockets, httpx, loguru).
+pipecat-floe
+
+# Example-only extras.
+python-dotenv
+
+# Silero VAD for turn-taking + the local WebSocket transport.
+pipecat-ai[silero,websocket]
