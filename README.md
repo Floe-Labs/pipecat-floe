@@ -10,7 +10,12 @@ Three drop-in Pipecat services:
 - **`FloeTTSService`** — OpenAI-compatible text-to-speech routed through Floe.
 - **`FloeSTTService`** — streaming speech-to-text over Floe's WebSocket.
 
-<!-- TODO: 30-60s demo video -->
+## Demo
+
+<!-- Drop the 30–60s demo video/GIF URL here. Recording guide: examples/DEMO.md -->
+
+_Demo video coming soon — one key metering STT + LLM + TTS on a single budget,
+live. See [`examples/DEMO.md`](examples/DEMO.md) for the recording guide._
 
 ## Install
 
