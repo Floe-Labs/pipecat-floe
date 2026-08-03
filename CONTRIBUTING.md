@@ -30,7 +30,7 @@ To run the example bot, see [`examples/README.md`](examples/README.md).
 
 ## Code Style
 
-- Python 3.10+
+- Python 3.11+
 - Type hints on all public functions
 - Full docstrings on public classes and methods
 - Follow existing patterns in `src/pipecat_floe/`
