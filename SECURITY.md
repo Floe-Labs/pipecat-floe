@@ -25,6 +25,7 @@ Additional internal security reviews have been conducted for the operator delega
 | AgentKit (npm `floe-agent`) | 0.2.x | ✅ |
 | AgentKit (PyPI `floe-agentkit-actions`) | 0.2.x | ✅ |
 | MCP Server (`@floelabs/mcp-server`) | 0.1.x | ✅ |
+| Pipecat services (PyPI `pipecat-floe`) | 0.1.x | ✅ |
 
 ## Responsible Disclosure
 

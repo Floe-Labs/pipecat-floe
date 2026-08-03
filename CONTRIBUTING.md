@@ -25,7 +25,7 @@ To run the example bot, see [`examples/README.md`](examples/README.md).
 
 1. Fork the repo and create your branch from `main`
 2. Keep changes focused; match the existing style
-3. Ensure `ruff check src/` passes and the package imports cleanly
+3. Ensure `ruff check src/` passes, the package imports cleanly, and `python -m build` succeeds
 4. Write a clear PR description explaining the change
 
 ## Code Style

@@ -34,11 +34,11 @@ jobs:
       - name: Install project with dev extras
         if: hashFiles('tests/**') != ''
         run: |
-          pip install -e ".[dev]"
+          python -m pip install -e ".[dev]"
 
       - name: Run tests
         if: hashFiles('tests/**') != ''
-        run: pytest
+        run: python -m pytest
 
       - name: Read package metadata
         id: meta
@@ -50,9 +50,10 @@ jobs:
 
       - name: Check if version is already published
         id: check
+        env:
+          PKG_NAME: ${{ steps.meta.outputs.name }}
+          PKG_VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          PKG_NAME="${{ steps.meta.outputs.name }}"
-          PKG_VERSION="${{ steps.meta.outputs.version }}"
           HTTP_CODE=$(curl -sS --connect-timeout 10 --max-time 20 -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$PKG_VERSION/json")
           case "$HTTP_CODE" in
             200)
