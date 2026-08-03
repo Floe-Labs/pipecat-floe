@@ -27,7 +27,7 @@ pip install "pipecat-ai[silero,websocket]"
 
 ## Pipecat version compatibility
 
-Built and verified against **`pipecat-ai` 1.7.0** (Python 3.10+). The services
+Built and verified against **`pipecat-ai` 1.7.0** (Python 3.11+). The services
 subclass Pipecat's own `OpenAILLMService`, `OpenAITTSService`, and
 `WebsocketSTTService`. Those base classes are stable, but Pipecat's import paths
 and constructor kwargs do shift between releases — pin `pipecat-ai` and
