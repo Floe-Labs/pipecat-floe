@@ -17,7 +17,12 @@ Three drop-in Pipecat services:
 - **`FloeTTSService`** — OpenAI-compatible text-to-speech routed through Floe.
 - **`FloeSTTService`** — streaming speech-to-text over Floe's WebSocket.
 
+*Built and maintained by [Floe Labs](https://floelabs.xyz) — the company behind
+Floe, the service these adapters route to.*
+
 <!-- TODO: 30-60s demo video -->
+
+> Community integration. Tested with `pipecat-ai` 1.7.0 (Python 3.11+).
 
 ## Install
 
