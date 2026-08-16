@@ -42,6 +42,7 @@ class FloeLLMService(OpenAILLMService):
         api_key: str | None = None,
         base_url: str = FLOE_BASE_URL,
         task_id: str | None = None,
+        provider_key: str | None = None,
         **kwargs,
     ) -> None:
         """Initialize the Floe LLM service.
@@ -56,6 +57,12 @@ class FloeLLMService(OpenAILLMService):
             task_id: Optional Floe task ID sent as the ``X-Floe-Task-Id`` header
                 on every request, so a per-task budget can bound one
                 conversation. Omit to leave the header off.
+            provider_key: Optional upstream provider key (**BYOK**). When set, it
+                is sent as the ``X-Floe-Provider-Key`` header so Floe routes the
+                call on *your* vendor key (e.g. your OpenAI key) and bills only
+                its service fee — while still metering the call and enforcing your
+                spend caps. Omit for the keyless path, where Floe uses its own
+                managed provider keys.
             **kwargs: Additional keyword arguments forwarded to
                 :class:`~pipecat.services.openai.llm.OpenAILLMService`.
 
@@ -70,8 +77,13 @@ class FloeLLMService(OpenAILLMService):
             )
 
         default_headers = kwargs.pop("default_headers", None)
+        extra_headers: dict[str, str] = {}
         if task_id is not None:
-            default_headers = {**(default_headers or {}), "X-Floe-Task-Id": task_id}
+            extra_headers["X-Floe-Task-Id"] = task_id
+        if provider_key is not None:
+            extra_headers["X-Floe-Provider-Key"] = provider_key
+        if extra_headers:
+            default_headers = {**(default_headers or {}), **extra_headers}
 
         # Prefer Pipecat's non-deprecated settings API for the model. If the
         # caller supplied their own settings, leave it untouched.

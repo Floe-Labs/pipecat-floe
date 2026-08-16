@@ -28,6 +28,12 @@ start talking.
 Set a **spend cap** on the Floe agent (dashboard, or `PUT /v1/agents/spend-limit`)
 to bound the whole run — STT + LLM + TTS together.
 
+**BYOK:** this example runs **keyless** (Floe manages the provider keys), so it
+works with just a `FLOE_API_KEY` and welcome credit — no vendor accounts. To route
+the LLM and TTS legs on **your own** vendor key instead — Floe meters + caps and
+bills only its fee — pass `provider_key=os.environ["OPENAI_API_KEY"]` to
+`FloeLLMService` / `FloeTTSService`. Streaming STT stays keyless either way.
+
 <!-- TODO: 30-60s demo video -->
 
 ## Notes
