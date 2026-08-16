@@ -48,7 +48,10 @@ re-verify when you upgrade.
 ## Quickstart
 
 One key powers all three legs. Set `FLOE_API_KEY` in your environment (get a key
-at [dev-dashboard.floelabs.xyz](https://dev-dashboard.floelabs.xyz)) and:
+at [dev-dashboard.floelabs.xyz](https://dev-dashboard.floelabs.xyz)) — that alone
+runs the **keyless** path. The **BYOK** snippet below *additionally* reads your own
+vendor key (`OPENAI_API_KEY`); drop `provider_key=` to run keyless with no vendor
+key at all.
 
 ```python
 import os

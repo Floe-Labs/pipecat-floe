@@ -62,8 +62,8 @@ class FloeTTSService(OpenAITTSService):
                 is sent as the ``X-Floe-Provider-Key`` header so Floe routes the
                 call on *your* vendor key and bills only its service fee — while
                 still metering and enforcing spend caps. Omit for the keyless
-                path. Ignored if you pass your own ``http_client`` (add the header
-                to that client yourself), same as ``task_id``.
+                path. Ignored if you pass your own ``http_client`` (add the
+                headers to that client yourself), same as ``task_id``.
             **kwargs: Additional keyword arguments forwarded to
                 :class:`~pipecat.services.openai.tts.OpenAITTSService`.
 
