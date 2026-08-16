@@ -42,6 +42,7 @@ class FloeTTSService(OpenAITTSService):
         api_key: str | None = None,
         base_url: str = FLOE_BASE_URL,
         task_id: str | None = None,
+        provider_key: str | None = None,
         **kwargs,
     ) -> None:
         """Initialize the Floe TTS service.
@@ -57,6 +58,12 @@ class FloeTTSService(OpenAITTSService):
             task_id: Optional Floe task ID sent as the ``X-Floe-Task-Id`` header
                 on every request, so a per-task budget can bound one
                 conversation. Omit to leave the header off.
+            provider_key: Optional upstream provider key (**BYOK**). When set, it
+                is sent as the ``X-Floe-Provider-Key`` header so Floe routes the
+                call on *your* vendor key and bills only its service fee — while
+                still metering and enforcing spend caps. Omit for the keyless
+                path. Ignored if you pass your own ``http_client`` (add the header
+                to that client yourself), same as ``task_id``.
             **kwargs: Additional keyword arguments forwarded to
                 :class:`~pipecat.services.openai.tts.OpenAITTSService`.
 
@@ -71,13 +78,17 @@ class FloeTTSService(OpenAITTSService):
             )
 
         # OpenAITTSService builds its own AsyncOpenAI client and does not expose
-        # a default_headers argument. To attach the optional X-Floe-Task-Id
-        # header we supply an httpx client carrying it as a default header,
-        # unless the caller already passed their own http_client.
-        if task_id is not None and "http_client" not in kwargs:
-            kwargs["http_client"] = httpx.AsyncClient(
-                headers={"X-Floe-Task-Id": task_id}
-            )
+        # a default_headers argument. To attach the optional Floe headers
+        # (X-Floe-Task-Id and/or the BYOK X-Floe-Provider-Key) we supply an httpx
+        # client carrying them as default headers, unless the caller already
+        # passed their own http_client.
+        floe_headers: dict[str, str] = {}
+        if task_id is not None:
+            floe_headers["X-Floe-Task-Id"] = task_id
+        if provider_key is not None:
+            floe_headers["X-Floe-Provider-Key"] = provider_key
+        if floe_headers and "http_client" not in kwargs:
+            kwargs["http_client"] = httpx.AsyncClient(headers=floe_headers)
 
         # Prefer Pipecat's non-deprecated settings API for model + voice. If the
         # caller supplied their own settings, leave it untouched.

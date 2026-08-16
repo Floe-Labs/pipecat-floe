@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pipecat-floe"
-version = "0.1.0"
+version = "0.2.0"
 description = "Floe services for Pipecat — one key for the LLM, STT, and TTS legs of a voice agent."
 readme = "README.md"
 license = { text = "MIT" }
