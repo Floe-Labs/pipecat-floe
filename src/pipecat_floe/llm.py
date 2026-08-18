@@ -125,21 +125,23 @@ class FloeLLMService(OpenAILLMService):
         ``hosted_remaining_usd`` is a synchronous blocking HTTP call, so it runs
         in a worker thread via :func:`asyncio.to_thread` to keep the turn path
         from stalling the loop. The result is cached for ``_remaining_ttl``
-        seconds. Fail-closed: on any error the last known value is kept and the
-        receipt still shows the cost.
+        seconds — the TTL is stamped before the attempt, so a *failed* read is
+        throttled too (at most one hosted read per window, success or failure).
+        Fail-closed: on any error the budget is dropped (shown as absent) rather
+        than displaying a stale figure, and the receipt still shows the cost.
         """
         if not self._cost_receipts or not hosted_enforcement_available():
             return None
         now = time.monotonic()
-        if (
-            self._remaining_usd is not None
-            and now - self._remaining_fetched_at < self._remaining_ttl
-        ):
+        if now - self._remaining_fetched_at < self._remaining_ttl:
             return self._remaining_usd
+        # Stamp before the attempt so a failing endpoint is throttled by the TTL,
+        # not retried on every turn.
+        self._remaining_fetched_at = now
         try:
             self._remaining_usd = await asyncio.to_thread(hosted_remaining_usd)
-            self._remaining_fetched_at = now
         except Exception:
+            self._remaining_usd = None
             logger.debug(
                 "floe: budget read failed; showing cost without budget", exc_info=True
             )
