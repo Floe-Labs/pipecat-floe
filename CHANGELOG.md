@@ -5,18 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-08-18
 
 ### Added
 
 - **Per-turn cost receipt on `FloeLLMService`.** After every LLM turn the
-  service logs a one-line receipt (`floe · gpt-4o · $0.0064 est · left $12.34`).
-  The cost is priced locally by `floe-guard` (free, offline, no key); the
-  remaining-budget half appears when `FLOE_API_KEY` is set and is a best-effort,
-  fail-closed hosted read (fetched off the event loop and cached ~30s). A model
-  `floe-guard` can't price logs nothing — fail-closed, never a fabricated `$0`.
-  On by default; disable with `cost_receipts=False`.
+  service logs a one-line receipt (real prod-captured line:
+  `floe · gpt-4o · $0.0012 est · left $99.88`). The cost is priced locally by
+  `floe-guard` (free, offline, no key); the remaining-budget half appears when a
+  Floe key is available. When `floe-guard` can't price the model, the service
+  emits no receipt — fail-closed, never a fabricated `$0`. On by default;
+  disable with `cost_receipts=False`.
 - Depends on `floe-guard>=0.19`.
+
+### Fixed
+
+- The remaining-budget read uses **this service's configured Floe key** (whether
+  passed via `api_key=` in code or taken from `FLOE_API_KEY`), not just the env —
+  so an in-code key no longer shows an empty or wrong-account balance.
+- The hosted budget read never runs on the turn path: it's off the event loop
+  (`asyncio.to_thread`), cached ~30s, and the first lookup fires immediately
+  regardless of the (boot-relative) monotonic clock. A failed read drops the
+  budget (cost still shows); cancellation propagates cleanly.
 
 ## [0.2.0] - 2026-08-16
 
@@ -49,5 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runnable example bot (`examples/bot.py`) wiring a WebSocket transport through
   all three legs on one Floe key.
 
+[0.3.0]: https://github.com/Floe-Labs/pipecat-floe/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Floe-Labs/pipecat-floe/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Floe-Labs/pipecat-floe/releases/tag/v0.1.0
