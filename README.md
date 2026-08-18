@@ -162,10 +162,10 @@ on-brand). One line to disable:
 llm = FloeLLMService(model="openai/gpt-4o-mini", cost_receipts=False)
 ```
 
-The receipt is logged at `INFO` via loguru:
+The receipt is logged at `INFO` via loguru (real line, captured against prod):
 
 ```text
-floe · gpt-4o · $0.0064 est · left $12.34
+floe · gpt-4o · $0.0012 est · left $99.88
 ```
 
 The cost half is priced **locally** by [`floe-guard`](https://github.com/Floe-Labs/floe-guard)
