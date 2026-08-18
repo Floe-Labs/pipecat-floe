@@ -13,9 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   service logs a one-line receipt (real prod-captured line:
   `floe · gpt-4o · $0.0012 est · left $99.88`). The cost is priced locally by
   `floe-guard` (free, offline, no key); the remaining-budget half appears when a
-  Floe key is available. A model `floe-guard` can't price logs nothing —
-  fail-closed, never a fabricated `$0`. On by default; disable with
-  `cost_receipts=False`.
+  Floe key is available. When `floe-guard` can't price the model, the service
+  emits no receipt — fail-closed, never a fabricated `$0`. On by default;
+  disable with `cost_receipts=False`.
 - Depends on `floe-guard>=0.19`.
 
 ### Fixed
@@ -59,5 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runnable example bot (`examples/bot.py`) wiring a WebSocket transport through
   all three legs on one Floe key.
 
+[0.3.0]: https://github.com/Floe-Labs/pipecat-floe/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Floe-Labs/pipecat-floe/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Floe-Labs/pipecat-floe/releases/tag/v0.1.0
