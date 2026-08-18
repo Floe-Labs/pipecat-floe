@@ -17,6 +17,13 @@ from __future__ import annotations
 
 import os
 
+from floe_guard import (
+    hosted_enforcement_available,
+    hosted_remaining_usd,
+    turn_cost,
+)
+from loguru import logger
+from pipecat.metrics.metrics import LLMTokenUsage
 from pipecat.services.openai.llm import OpenAILLMService
 
 from pipecat_floe.constants import FLOE_API_KEY_ENV, FLOE_BASE_URL
@@ -43,6 +50,7 @@ class FloeLLMService(OpenAILLMService):
         base_url: str = FLOE_BASE_URL,
         task_id: str | None = None,
         provider_key: str | None = None,
+        cost_receipts: bool = True,
         **kwargs,
     ) -> None:
         """Initialize the Floe LLM service.
@@ -63,6 +71,10 @@ class FloeLLMService(OpenAILLMService):
                 its service fee — while still metering the call and enforcing your
                 spend caps. Omit for the keyless path, where Floe uses its own
                 managed provider keys.
+            cost_receipts: When ``True`` (the default), log a one-line cost
+                receipt after every LLM turn — the model, this turn's estimated
+                USD cost, and, when a Floe key is present, the remaining hosted
+                budget. Set ``False`` to silence it.
             **kwargs: Additional keyword arguments forwarded to
                 :class:`~pipecat.services.openai.llm.OpenAILLMService`.
 
@@ -96,3 +108,37 @@ class FloeLLMService(OpenAILLMService):
             default_headers=default_headers,
             **kwargs,
         )
+
+        self._cost_receipts = cost_receipts
+
+    async def start_llm_usage_metrics(self, tokens: LLMTokenUsage) -> None:
+        """Log a per-turn cost receipt, then defer to the inherited metrics.
+
+        Pipecat calls this once per completion with *this* turn's (non-cumulative)
+        token usage. The cost figure is priced locally by ``floe-guard`` (free,
+        offline, no key). The remaining-budget half is a hosted read that needs a
+        Floe key — it is best-effort and fail-closed: any failure logs a debug
+        line and the receipt still shows the cost. If the model cannot be priced,
+        ``turn_cost`` returns ``None`` and no receipt is emitted (never a
+        fabricated ``$0``).
+        """
+        await super().start_llm_usage_metrics(tokens)
+        if not self._cost_receipts:
+            return
+
+        remaining = None
+        if hosted_enforcement_available():
+            try:
+                remaining = hosted_remaining_usd()
+            except Exception:
+                logger.debug("floe: budget read failed; showing cost without budget")
+
+        cost = turn_cost(
+            self._settings.model,
+            tokens.prompt_tokens,
+            tokens.completion_tokens,
+            remaining_usd=remaining,
+        )
+        if cost is None:
+            return
+        logger.info(cost.format())

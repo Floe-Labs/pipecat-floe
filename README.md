@@ -152,6 +152,30 @@ FloeSTTService(
   an `ErrorFrame` and the stream is torn down cleanly. Reconnect-with-backoff and
   audio buffering come from the base class.
 
+## Per-turn cost receipt
+
+`FloeLLMService` logs a one-line cost receipt after every LLM turn — **on by
+default** (pipecat-floe is a metering-branded service, so showing the cost is
+on-brand). One line to disable:
+
+```python
+llm = FloeLLMService(model="openai/gpt-4o-mini", cost_receipts=False)
+```
+
+The receipt is logged at `INFO` via loguru:
+
+```text
+floe · gpt-4o · $0.0064 est · left $12.34
+```
+
+The cost half is priced **locally** by [`floe-guard`](https://github.com/Floe-Labs/floe-guard)
+(free, offline, no key — `est` means a local estimate). The `left $…` budget half
+only appears when `FLOE_API_KEY` is set: it's a best-effort, fail-closed read of
+your hosted Floe balance, so a failed read simply drops the budget and still
+shows the cost. Without a key you get the cost line alone (`floe · gpt-4o ·
+$0.0064 est`). A live-prod screenshot with the budget half is captured
+separately with a funded key.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
