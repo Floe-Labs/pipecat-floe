@@ -140,6 +140,8 @@ class FloeLLMService(OpenAILLMService):
         self._remaining_fetched_at = now
         try:
             self._remaining_usd = await asyncio.to_thread(hosted_remaining_usd)
+        except asyncio.CancelledError:
+            raise  # let task cancellation propagate; never swallow it
         except Exception:
             self._remaining_usd = None
             logger.debug(
