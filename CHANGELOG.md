@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Per-turn cost receipt on `FloeLLMService`.** After every LLM turn the
+  service logs a one-line receipt (`floe · gpt-4o · $0.0064 est · left $12.34`).
+  The cost is priced locally by `floe-guard` (free, offline, no key); the
+  remaining-budget half appears when `FLOE_API_KEY` is set and is a best-effort,
+  fail-closed hosted read (fetched off the event loop and cached ~30s). A model
+  `floe-guard` can't price logs nothing — fail-closed, never a fabricated `$0`.
+  On by default; disable with `cost_receipts=False`.
+- Depends on `floe-guard>=0.19`.
+
 ## [0.2.0] - 2026-08-16
 
 ### Added

@@ -15,8 +15,18 @@ OpenAI service.
 
 from __future__ import annotations
 
+import asyncio
 import os
+import time
+from dataclasses import replace
 
+from floe_guard import (
+    hosted_enforcement_available,
+    hosted_remaining_usd,
+    turn_cost,
+)
+from loguru import logger
+from pipecat.metrics.metrics import LLMTokenUsage
 from pipecat.services.openai.llm import OpenAILLMService
 
 from pipecat_floe.constants import FLOE_API_KEY_ENV, FLOE_BASE_URL
@@ -43,6 +53,7 @@ class FloeLLMService(OpenAILLMService):
         base_url: str = FLOE_BASE_URL,
         task_id: str | None = None,
         provider_key: str | None = None,
+        cost_receipts: bool = True,
         **kwargs,
     ) -> None:
         """Initialize the Floe LLM service.
@@ -63,6 +74,10 @@ class FloeLLMService(OpenAILLMService):
                 its service fee — while still metering the call and enforcing your
                 spend caps. Omit for the keyless path, where Floe uses its own
                 managed provider keys.
+            cost_receipts: When ``True`` (the default), log a one-line cost
+                receipt after every LLM turn — the model, this turn's estimated
+                USD cost, and, when a Floe key is present, the remaining hosted
+                budget. Set ``False`` to silence it.
             **kwargs: Additional keyword arguments forwarded to
                 :class:`~pipecat.services.openai.llm.OpenAILLMService`.
 
@@ -96,3 +111,63 @@ class FloeLLMService(OpenAILLMService):
             default_headers=default_headers,
             **kwargs,
         )
+
+        self._cost_receipts = cost_receipts
+        # Cached hosted budget, refreshed at most once per ``_remaining_ttl``
+        # seconds so a receipt never triggers a network hit on every turn.
+        self._remaining_usd: float | None = None
+        self._remaining_fetched_at: float = 0.0
+        self._remaining_ttl = 30.0
+
+    async def _budget_remaining(self) -> float | None:
+        """Best-effort remaining hosted budget, off the event loop and throttled.
+
+        ``hosted_remaining_usd`` is a synchronous blocking HTTP call, so it runs
+        in a worker thread via :func:`asyncio.to_thread` to keep the turn path
+        from stalling the loop. The result is cached for ``_remaining_ttl``
+        seconds. Fail-closed: on any error the last known value is kept and the
+        receipt still shows the cost.
+        """
+        if not self._cost_receipts or not hosted_enforcement_available():
+            return None
+        now = time.monotonic()
+        if (
+            self._remaining_usd is not None
+            and now - self._remaining_fetched_at < self._remaining_ttl
+        ):
+            return self._remaining_usd
+        try:
+            self._remaining_usd = await asyncio.to_thread(hosted_remaining_usd)
+            self._remaining_fetched_at = now
+        except Exception:
+            logger.debug(
+                "floe: budget read failed; showing cost without budget", exc_info=True
+            )
+        return self._remaining_usd
+
+    async def start_llm_usage_metrics(self, tokens: LLMTokenUsage) -> None:
+        """Defer to the inherited metrics, then log a per-turn cost receipt.
+
+        Pipecat calls this once per completion with *this* turn's (non-cumulative)
+        token usage. The cost is priced locally by ``floe-guard`` (free, offline,
+        no key). If the model cannot be priced, ``turn_cost`` returns ``None`` and
+        no receipt is emitted (never a fabricated ``$0``) — and no hosted budget
+        call is made. Only for a priceable turn is the remaining-budget half read,
+        best-effort and off the event loop (see :meth:`_budget_remaining`).
+        """
+        await super().start_llm_usage_metrics(tokens)
+        if not self._cost_receipts:
+            return
+
+        # Price FIRST — an unpriceable model short-circuits before any hosted call.
+        cost = turn_cost(
+            self._settings.model,
+            tokens.prompt_tokens,
+            tokens.completion_tokens,
+        )
+        if cost is None:
+            return
+
+        remaining = await self._budget_remaining()
+        short = self._settings.model.split("/")[-1]
+        logger.info(replace(cost, model=short, remaining_usd=remaining).format())
