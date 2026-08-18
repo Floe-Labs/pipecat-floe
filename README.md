@@ -171,9 +171,11 @@ floe · gpt-4o · $0.0012 est · left $99.88
 The cost half is priced **locally** by [`floe-guard`](https://github.com/Floe-Labs/floe-guard)
 (free, offline, no key — `est` means a local estimate). The `left $…` budget half
 only appears when `FLOE_API_KEY` is set: it's a best-effort, fail-closed read of
-your hosted Floe balance, so a failed read simply drops the budget and still
-shows the cost. Without a key you get the cost line alone (`floe · gpt-4o ·
-$0.0064 est`). A live-prod screenshot with the budget half is captured
+your hosted Floe balance (fetched off the event loop and cached ~30s, so it never
+stalls a turn), so a failed read simply drops the budget and still shows the
+cost. Without a key you get the cost line alone (`floe · gpt-4o · $0.0075 est`).
+A model `floe-guard` can't price logs **nothing** — fail-closed, never a
+fabricated `$0`. A live-prod screenshot with the budget half is captured
 separately with a funded key.
 
 ## License

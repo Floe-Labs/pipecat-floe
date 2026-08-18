@@ -15,7 +15,10 @@ OpenAI service.
 
 from __future__ import annotations
 
+import asyncio
 import os
+import time
+from dataclasses import replace
 
 from floe_guard import (
     hosted_enforcement_available,
@@ -110,35 +113,61 @@ class FloeLLMService(OpenAILLMService):
         )
 
         self._cost_receipts = cost_receipts
+        # Cached hosted budget, refreshed at most once per ``_remaining_ttl``
+        # seconds so a receipt never triggers a network hit on every turn.
+        self._remaining_usd: float | None = None
+        self._remaining_fetched_at: float = 0.0
+        self._remaining_ttl = 30.0
+
+    async def _budget_remaining(self) -> float | None:
+        """Best-effort remaining hosted budget, off the event loop and throttled.
+
+        ``hosted_remaining_usd`` is a synchronous blocking HTTP call, so it runs
+        in a worker thread via :func:`asyncio.to_thread` to keep the turn path
+        from stalling the loop. The result is cached for ``_remaining_ttl``
+        seconds. Fail-closed: on any error the last known value is kept and the
+        receipt still shows the cost.
+        """
+        if not self._cost_receipts or not hosted_enforcement_available():
+            return None
+        now = time.monotonic()
+        if (
+            self._remaining_usd is not None
+            and now - self._remaining_fetched_at < self._remaining_ttl
+        ):
+            return self._remaining_usd
+        try:
+            self._remaining_usd = await asyncio.to_thread(hosted_remaining_usd)
+            self._remaining_fetched_at = now
+        except Exception:
+            logger.debug(
+                "floe: budget read failed; showing cost without budget", exc_info=True
+            )
+        return self._remaining_usd
 
     async def start_llm_usage_metrics(self, tokens: LLMTokenUsage) -> None:
-        """Log a per-turn cost receipt, then defer to the inherited metrics.
+        """Defer to the inherited metrics, then log a per-turn cost receipt.
 
         Pipecat calls this once per completion with *this* turn's (non-cumulative)
-        token usage. The cost figure is priced locally by ``floe-guard`` (free,
-        offline, no key). The remaining-budget half is a hosted read that needs a
-        Floe key — it is best-effort and fail-closed: any failure logs a debug
-        line and the receipt still shows the cost. If the model cannot be priced,
-        ``turn_cost`` returns ``None`` and no receipt is emitted (never a
-        fabricated ``$0``).
+        token usage. The cost is priced locally by ``floe-guard`` (free, offline,
+        no key). If the model cannot be priced, ``turn_cost`` returns ``None`` and
+        no receipt is emitted (never a fabricated ``$0``) — and no hosted budget
+        call is made. Only for a priceable turn is the remaining-budget half read,
+        best-effort and off the event loop (see :meth:`_budget_remaining`).
         """
         await super().start_llm_usage_metrics(tokens)
         if not self._cost_receipts:
             return
 
-        remaining = None
-        if hosted_enforcement_available():
-            try:
-                remaining = hosted_remaining_usd()
-            except Exception:
-                logger.debug("floe: budget read failed; showing cost without budget")
-
+        # Price FIRST — an unpriceable model short-circuits before any hosted call.
         cost = turn_cost(
             self._settings.model,
             tokens.prompt_tokens,
             tokens.completion_tokens,
-            remaining_usd=remaining,
         )
         if cost is None:
             return
-        logger.info(cost.format())
+
+        remaining = await self._budget_remaining()
+        short = self._settings.model.split("/")[-1]
+        logger.info(replace(cost, model=short, remaining_usd=remaining).format())

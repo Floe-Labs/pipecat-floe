@@ -47,7 +47,8 @@ def test_receipt_logged_on_by_default(sink, monkeypatch):
     asyncio.run(svc.start_llm_usage_metrics(TOKENS))
 
     receipts = [m for m in sink if m.startswith("floe · ")]
-    assert receipts == ["floe · openai/gpt-4o · $0.0075 est"]
+    # Display uses the short model id (gpt-4o), though pricing uses the full id.
+    assert receipts == ["floe · gpt-4o · $0.0075 est"]
 
 
 def test_cost_receipts_false_suppresses(sink, monkeypatch):
@@ -67,7 +68,7 @@ def test_budget_half_appended_when_key_present(sink, monkeypatch):
     asyncio.run(svc.start_llm_usage_metrics(TOKENS))
 
     receipts = [m for m in sink if m.startswith("floe · ")]
-    assert receipts == ["floe · openai/gpt-4o · $0.0075 est · left $12.34"]
+    assert receipts == ["floe · gpt-4o · $0.0075 est · left $12.34"]
 
 
 def test_budget_read_failure_is_fail_closed(sink, monkeypatch):
@@ -82,15 +83,24 @@ def test_budget_read_failure_is_fail_closed(sink, monkeypatch):
     asyncio.run(svc.start_llm_usage_metrics(TOKENS))
 
     receipts = [m for m in sink if m.startswith("floe · ")]
-    assert receipts == ["floe · openai/gpt-4o · $0.0075 est"]
+    assert receipts == ["floe · gpt-4o · $0.0075 est"]
 
 
-def test_unpriceable_model_emits_no_receipt(sink, monkeypatch):
-    monkeypatch.setattr("pipecat_floe.llm.hosted_enforcement_available", lambda: False)
-    svc = _service()
-    # Simulate a model the cost map can't price → turn_cost returns None.
+def test_unpriceable_model_skips_hosted_read(sink, monkeypatch):
+    # Price FIRST: an unpriceable model must short-circuit before any hosted
+    # network call — even when a key is present.
+    calls: list[bool] = []
+
+    def spy() -> float:
+        calls.append(True)
+        return 12.34
+
+    monkeypatch.setattr("pipecat_floe.llm.hosted_enforcement_available", lambda: True)
+    monkeypatch.setattr("pipecat_floe.llm.hosted_remaining_usd", spy)
     monkeypatch.setattr("pipecat_floe.llm.turn_cost", lambda *a, **k: None)
+    svc = _service()
 
     asyncio.run(svc.start_llm_usage_metrics(TOKENS))
 
+    assert calls == []  # hosted endpoint never touched
     assert not [m for m in sink if m.startswith("floe · ")]
