@@ -24,7 +24,7 @@ from pipecat_floe.llm import FloeLLMService
 from pipecat_floe.stt import FloeSTTService
 from pipecat_floe.tts import FloeTTSService
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "FloeLLMService",
