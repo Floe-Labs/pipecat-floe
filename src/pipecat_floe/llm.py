@@ -21,7 +21,6 @@ import time
 from dataclasses import replace
 
 from floe_guard import (
-    hosted_enforcement_available,
     hosted_remaining_usd,
     turn_cost,
 )
@@ -90,6 +89,9 @@ class FloeLLMService(OpenAILLMService):
                 "A Floe API key is required. Pass api_key=... or set the "
                 f"{FLOE_API_KEY_ENV} environment variable."
             )
+        # Keep the key this service actually bills on, so the hosted budget read
+        # is for THIS account — not whatever FLOE_API_KEY happens to be in env.
+        self._floe_api_key = resolved_key
 
         default_headers = kwargs.pop("default_headers", None)
         extra_headers: dict[str, str] = {}
@@ -124,6 +126,10 @@ class FloeLLMService(OpenAILLMService):
     async def _budget_remaining(self) -> float | None:
         """Best-effort remaining hosted budget, off the event loop and throttled.
 
+        The balance is read for THIS service's configured Floe key (whether
+        passed in code via ``api_key=`` or taken from ``FLOE_API_KEY`` in env),
+        so the budget always matches the account this service bills on.
+
         ``hosted_remaining_usd`` is a synchronous blocking HTTP call, so it runs
         in a worker thread via :func:`asyncio.to_thread` to keep the turn path
         from stalling the loop. The result is cached for ``_remaining_ttl``
@@ -132,7 +138,10 @@ class FloeLLMService(OpenAILLMService):
         Fail-closed: on any error the budget is dropped (shown as absent) rather
         than displaying a stale figure, and the receipt still shows the cost.
         """
-        if not self._cost_receipts or not hosted_enforcement_available():
+        # No env gate: the service always has a resolved key (``self._floe_api_key``),
+        # so the in-code ``api_key=`` path must still read a balance even when
+        # ``FLOE_API_KEY`` is unset in the environment.
+        if not self._cost_receipts:
             return None
         now = time.monotonic()
         if now - self._remaining_fetched_at < self._remaining_ttl:
@@ -141,7 +150,9 @@ class FloeLLMService(OpenAILLMService):
         # not retried on every turn.
         self._remaining_fetched_at = now
         try:
-            self._remaining_usd = await asyncio.to_thread(hosted_remaining_usd)
+            self._remaining_usd = await asyncio.to_thread(
+                hosted_remaining_usd, self._floe_api_key
+            )
         except asyncio.CancelledError:
             raise  # let task cancellation propagate; never swallow it
         except Exception:

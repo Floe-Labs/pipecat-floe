@@ -24,6 +24,11 @@ from pipecat_floe import FloeLLMService
 TOKENS = LLMTokenUsage(prompt_tokens=1000, completion_tokens=500, total_tokens=1500)
 
 
+def _unavailable(*_args, **_kwargs) -> float:
+    """Stand-in for a hosted budget read that can't reach Floe (fail-closed)."""
+    raise RuntimeError("hosted unavailable")
+
+
 @pytest.fixture
 def sink() -> list[str]:
     """Capture loguru INFO+ messages emitted during a test."""
@@ -40,8 +45,9 @@ def _service(**kwargs) -> FloeLLMService:
 
 
 def test_receipt_logged_on_by_default(sink, monkeypatch):
-    # No key present → local cost only, no budget half, no network.
-    monkeypatch.setattr("pipecat_floe.llm.hosted_enforcement_available", lambda: False)
+    # On by default: a priceable turn logs a receipt. The hosted read is patched
+    # to fail, so the line is cost-only (fail-closed) and no network is hit.
+    monkeypatch.setattr("pipecat_floe.llm.hosted_remaining_usd", _unavailable)
     svc = _service()
 
     asyncio.run(svc.start_llm_usage_metrics(TOKENS))
@@ -51,8 +57,8 @@ def test_receipt_logged_on_by_default(sink, monkeypatch):
     assert receipts == ["floe · gpt-4o · $0.0075 est"]
 
 
-def test_cost_receipts_false_suppresses(sink, monkeypatch):
-    monkeypatch.setattr("pipecat_floe.llm.hosted_enforcement_available", lambda: False)
+def test_cost_receipts_false_suppresses(sink):
+    # cost_receipts=False returns before any hosted read — no patch needed.
     svc = _service(cost_receipts=False)
 
     asyncio.run(svc.start_llm_usage_metrics(TOKENS))
@@ -61,8 +67,7 @@ def test_cost_receipts_false_suppresses(sink, monkeypatch):
 
 
 def test_budget_half_appended_when_key_present(sink, monkeypatch):
-    monkeypatch.setattr("pipecat_floe.llm.hosted_enforcement_available", lambda: True)
-    monkeypatch.setattr("pipecat_floe.llm.hosted_remaining_usd", lambda: 12.34)
+    monkeypatch.setattr("pipecat_floe.llm.hosted_remaining_usd", lambda *a, **k: 12.34)
     svc = _service()
 
     asyncio.run(svc.start_llm_usage_metrics(TOKENS))
@@ -74,11 +79,10 @@ def test_budget_half_appended_when_key_present(sink, monkeypatch):
 def test_budget_read_failure_drops_budget_and_is_throttled(sink, monkeypatch):
     calls: list[bool] = []
 
-    def boom() -> float:
+    def boom(*_a, **_k) -> float:
         calls.append(True)
         raise RuntimeError("hosted down")
 
-    monkeypatch.setattr("pipecat_floe.llm.hosted_enforcement_available", lambda: True)
     monkeypatch.setattr("pipecat_floe.llm.hosted_remaining_usd", boom)
     svc = _service()
 
@@ -105,11 +109,10 @@ def test_unpriceable_model_skips_hosted_read(sink, monkeypatch):
     # network call — even when a key is present.
     calls: list[bool] = []
 
-    def spy() -> float:
+    def spy(*_a, **_k) -> float:
         calls.append(True)
         return 12.34
 
-    monkeypatch.setattr("pipecat_floe.llm.hosted_enforcement_available", lambda: True)
     monkeypatch.setattr("pipecat_floe.llm.hosted_remaining_usd", spy)
     monkeypatch.setattr("pipecat_floe.llm.turn_cost", lambda *a, **k: None)
     svc = _service()
@@ -118,3 +121,26 @@ def test_unpriceable_model_skips_hosted_read(sink, monkeypatch):
 
     assert calls == []  # hosted endpoint never touched
     assert not [m for m in sink if m.startswith("floe · ")]
+
+
+def test_budget_read_uses_in_code_key_not_env(sink, monkeypatch):
+    # Devin's bug: with an in-code api_key and no FLOE_API_KEY in env, the
+    # balance must be read for the in-code key — not the env key (absent here).
+    monkeypatch.delenv("FLOE_API_KEY", raising=False)
+    seen: list[str | None] = []
+
+    def spy(api_key=None, *_a, **_k) -> float:
+        seen.append(api_key)
+        return 42.0
+
+    monkeypatch.setattr("pipecat_floe.llm.hosted_remaining_usd", spy)
+    svc = FloeLLMService(
+        model="openai/gpt-4o", api_key="floe_incode", cost_receipts=True
+    )
+
+    asyncio.run(svc.start_llm_usage_metrics(TOKENS))
+
+    # The service's own configured key reached the hosted read, not None/env.
+    assert seen == ["floe_incode"]
+    receipts = [m for m in sink if m.startswith("floe · ")]
+    assert receipts == ["floe · gpt-4o · $0.0075 est · left $42.00"]
