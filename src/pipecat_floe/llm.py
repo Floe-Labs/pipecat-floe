@@ -116,7 +116,9 @@ class FloeLLMService(OpenAILLMService):
         # Cached hosted budget, refreshed at most once per ``_remaining_ttl``
         # seconds so a receipt never triggers a network hit on every turn.
         self._remaining_usd: float | None = None
-        self._remaining_fetched_at: float = 0.0
+        # -inf, not 0.0: monotonic() is boot-relative, so 0.0 would suppress the
+        # first budget lookup on a machine up less than the TTL.
+        self._remaining_fetched_at: float = float("-inf")
         self._remaining_ttl = 30.0
 
     async def _budget_remaining(self) -> float | None:
