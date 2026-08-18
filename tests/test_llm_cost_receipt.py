@@ -71,19 +71,33 @@ def test_budget_half_appended_when_key_present(sink, monkeypatch):
     assert receipts == ["floe · gpt-4o · $0.0075 est · left $12.34"]
 
 
-def test_budget_read_failure_is_fail_closed(sink, monkeypatch):
+def test_budget_read_failure_drops_budget_and_is_throttled(sink, monkeypatch):
+    calls: list[bool] = []
+
     def boom() -> float:
+        calls.append(True)
         raise RuntimeError("hosted down")
 
     monkeypatch.setattr("pipecat_floe.llm.hosted_enforcement_available", lambda: True)
     monkeypatch.setattr("pipecat_floe.llm.hosted_remaining_usd", boom)
     svc = _service()
 
-    # Must not raise into the pipeline; still shows cost without the budget half.
-    asyncio.run(svc.start_llm_usage_metrics(TOKENS))
+    async def two_turns() -> None:
+        # Two turns inside the TTL window.
+        await svc.start_llm_usage_metrics(TOKENS)
+        await svc.start_llm_usage_metrics(TOKENS)
+
+    # Must not raise into the pipeline; the budget is dropped (no `left $…`) and
+    # the receipt still shows the cost on every turn.
+    asyncio.run(two_turns())
 
     receipts = [m for m in sink if m.startswith("floe · ")]
-    assert receipts == ["floe · gpt-4o · $0.0075 est"]
+    assert receipts == [
+        "floe · gpt-4o · $0.0075 est",
+        "floe · gpt-4o · $0.0075 est",
+    ]
+    # Throttled by the TTL: the failing endpoint is hit at most once per window.
+    assert calls == [True]
 
 
 def test_unpriceable_model_skips_hosted_read(sink, monkeypatch):
