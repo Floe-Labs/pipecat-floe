@@ -1,5 +1,11 @@
 # pipecat-floe
 
+[![PyPI version](https://img.shields.io/pypi/v/pipecat-floe.svg)](https://pypi.org/project/pipecat-floe/)
+[![Downloads](https://static.pepy.tech/badge/pipecat-floe/month)](https://pepy.tech/project/pipecat-floe)
+[![Python versions](https://img.shields.io/pypi/pyversions/pipecat-floe.svg)](https://pypi.org/project/pipecat-floe/)
+[![CI](https://github.com/Floe-Labs/pipecat-floe/actions/workflows/ci.yml/badge.svg)](https://github.com/Floe-Labs/pipecat-floe/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 **Floe services for [Pipecat](https://github.com/pipecat-ai/pipecat).** Meter
 every leg of a voice agent — LLM, STT, TTS — per call, on one Floe key, with
 pre-call spend caps.
