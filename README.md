@@ -23,7 +23,7 @@ Three drop-in Pipecat services:
 - **`FloeTTSService`** — OpenAI-compatible text-to-speech routed through Floe.
 - **`FloeSTTService`** — streaming speech-to-text over Floe's WebSocket.
 
-*Built and maintained by [Floe Labs](https://floelabs.xyz) — the company behind
+*Built and maintained by [Floe Labs](https://floefinance.com) — the company behind
 Floe, the service these adapters route to.*
 
 <!-- TODO: 30-60s demo video -->
