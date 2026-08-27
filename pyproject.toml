@@ -33,7 +33,7 @@ dependencies = [
 dev = ["ruff>=0.6", "build>=1.0", "pytest>=8"]
 
 [project.urls]
-Homepage = "https://floelabs.xyz"
+Homepage = "https://floefinance.com"
 Documentation = "https://floe-labs.gitbook.io/docs"
 Repository = "https://github.com/Floe-Labs/pipecat-floe"
 
