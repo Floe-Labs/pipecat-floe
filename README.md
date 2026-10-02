@@ -1,3 +1,6 @@
+> [!NOTE]
+> **Maintenance mode.** `pipecat-floe` gets bug and compatibility fixes only; no new features are planned. It stays published on [PyPI](https://pypi.org/project/pipecat-floe/).
+
 # pipecat-floe
 
 [![PyPI version](https://img.shields.io/pypi/v/pipecat-floe.svg)](https://pypi.org/project/pipecat-floe/)
